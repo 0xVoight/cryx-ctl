@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { expandHome, sshConnectArgs, sshInvocation } from './command.js';
+import {
+  remotePull, needsInstall, remoteInstall, remoteServiceAction,
+  remoteStatus, remoteLogs, remoteRun, remoteSmoke,
+} from './command.js';
 import type { DeployConfig } from './config.js';
 
 const cfg: DeployConfig = {
@@ -39,4 +43,55 @@ test('sshInvocation with no remote command is an interactive login', () => {
   const argv = sshInvocation(cfg, undefined, { tty: true });
   assert.equal(argv[0], 'ssh');
   assert.equal(argv.at(-1), 'deploy@141.255.161.178'); // host is last → interactive shell
+});
+
+test('remotePull cds, ff-only pulls the branch, and prints changed files on stdout', () => {
+  const s = remotePull(cfg);
+  assert.match(s, /cd '\/home\/deploy\/orch-bot'/);
+  assert.match(s, /git pull --ff-only origin main/);
+  assert.match(s, /git diff --name-only/);
+});
+
+test('needsInstall is true when a changed file matches installWhen', () => {
+  assert.equal(needsInstall(['src/llm.ts', 'package.json'], cfg), true);
+  assert.equal(needsInstall(['package-lock.json'], cfg), true);
+});
+
+test('needsInstall is false when nothing matches', () => {
+  assert.equal(needsInstall(['src/llm.ts', 'README.md'], cfg), false);
+  assert.equal(needsInstall([], cfg), false);
+});
+
+test('needsInstall supports a simple glob in installWhen', () => {
+  const g = { ...cfg, installWhen: ['apps/*/package.json'] };
+  assert.equal(needsInstall(['apps/web/package.json'], g), true);
+  assert.equal(needsInstall(['apps/web/src/x.ts'], g), false);
+});
+
+test('remoteInstall runs npm ci in the remote path', () => {
+  assert.match(remoteInstall(cfg), /cd '\/home\/deploy\/orch-bot' && npm ci/);
+});
+
+test('remoteServiceAction uses sudo systemctl <action> <service>', () => {
+  assert.equal(remoteServiceAction(cfg, 'restart'), "sudo systemctl restart 'orch-bot'");
+  assert.equal(remoteServiceAction(cfg, 'stop'), "sudo systemctl stop 'orch-bot'");
+});
+
+test('remoteStatus reports is-active + deployed commit + recent log', () => {
+  const s = remoteStatus(cfg);
+  assert.match(s, /systemctl is-active 'orch-bot'/);
+  assert.match(s, /git -C '\/home\/deploy\/orch-bot' log --oneline -1/);
+});
+
+test('remoteLogs honours follow and lines', () => {
+  assert.match(remoteLogs(cfg, { lines: 50 }), /journalctl -u 'orch-bot' -n 50/);
+  assert.match(remoteLogs(cfg, { follow: true }), /journalctl -u 'orch-bot' .*-f/);
+});
+
+test('remoteRun runs an arbitrary command in the remote path', () => {
+  assert.equal(remoteRun(cfg, 'ls -la'), "cd '/home/deploy/orch-bot' && ls -la");
+});
+
+test('remoteSmoke greps the journal for the smoke string', () => {
+  assert.match(remoteSmoke(cfg), /journalctl -u 'orch-bot' .*grep -m1 -- 'concurrent long polling'/);
 });
