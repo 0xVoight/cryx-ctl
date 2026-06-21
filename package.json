@@ -1,0 +1,31 @@
+{
+  "name": "cryx-ctl",
+  "version": "0.1.0",
+  "description": "Config-driven ops CLI for the dev<->VPS loop (deploy/logs/status/restart/ssh/run).",
+  "type": "module",
+  "bin": {
+    "cryxctl": "dist/cli.js",
+    "cx": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli.ts",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepare": "npm run build"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "commander": "^15.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}
