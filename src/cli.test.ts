@@ -51,3 +51,23 @@ test('`run` forwards an arbitrary command', async () => {
   await run(['run', 'ls -la'], h.deps);
   assert.match(h.calls.map((c) => c.join(' ')).join('\n'), /cd '\/srv\/app' && ls -la/);
 });
+
+test('`deploy` without --yes does NOT execute (gate refusal)', async () => {
+  const h = harness();
+  await run(['deploy'], h.deps);
+  assert.equal(h.isDeployed(), false);
+});
+
+test('`restart` without --yes does NOT call systemctl restart (gate refusal)', async () => {
+  const h = harness();
+  await run(['restart'], h.deps);
+  const joined = h.calls.map((c) => c.join(' ')).join('\n');
+  assert.ok(!joined.includes('systemctl restart'), `expected no systemctl restart, got: ${joined}`);
+});
+
+test('`stop` without --yes does NOT call systemctl stop (gate refusal)', async () => {
+  const h = harness();
+  await run(['stop'], h.deps);
+  const joined = h.calls.map((c) => c.join(' ')).join('\n');
+  assert.ok(!joined.includes('systemctl stop'), `expected no systemctl stop, got: ${joined}`);
+});

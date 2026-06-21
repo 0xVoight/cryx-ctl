@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { expandHome, sshConnectArgs, sshInvocation } from './command.js';
 import {
+  expandHome, sshConnectArgs, sshInvocation,
   remotePull, needsInstall, remoteInstall, remoteServiceAction,
   remoteStatus, remoteLogs, remoteRun, remoteSmoke,
 } from './command.js';
@@ -48,7 +48,7 @@ test('sshInvocation with no remote command is an interactive login', () => {
 test('remotePull cds, ff-only pulls the branch, and prints changed files on stdout', () => {
   const s = remotePull(cfg);
   assert.match(s, /cd '\/home\/deploy\/orch-bot'/);
-  assert.match(s, /git pull --ff-only origin main/);
+  assert.match(s, /git pull --ff-only origin 'main'/);
   assert.match(s, /git diff --name-only/);
 });
 
@@ -94,4 +94,15 @@ test('remoteRun runs an arbitrary command in the remote path', () => {
 
 test('remoteSmoke greps the journal for the smoke string', () => {
   assert.match(remoteSmoke(cfg), /journalctl -u 'orch-bot' .*grep -m1 -- 'concurrent long polling'/);
+});
+
+test('remoteLogs with lines: 0 includes -n 0 (not dropped)', () => {
+  assert.match(remoteLogs(cfg, { lines: 0 }), /journalctl -u 'orch-bot' -n 0/);
+});
+
+test('sq() escapes an embedded single quote via POSIX pattern', () => {
+  assert.equal(
+    remoteServiceAction({ ...cfg, service: "a'b" }, 'restart'),
+    "sudo systemctl restart 'a'\\''b'",
+  );
 });

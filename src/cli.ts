@@ -19,6 +19,7 @@ const defaultDeps: CliDeps = {
 };
 
 async function confirm(action: string, yes: boolean): Promise<boolean> {
+  // intentionally non-interactive: the gate is flag-only (--yes); never add a stdin prompt (would hang in CI/scripts)
   if (yes) return true;
   process.stderr.write(`Refusing destructive '${action}' without --yes. Re-run with --yes to proceed.\n`);
   return false;
@@ -38,19 +39,21 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
     });
 
   for (const action of ['restart', 'stop', 'start'] as const) {
-    program.command(action)
-      .description(`sudo systemctl ${action} the service`)
-      .option('-y, --yes', 'skip the confirmation prompt')
-      .action(async (o) => {
-        if (action !== 'start' && !(await confirm(action, !!o.yes))) return;
-        await deps.runner(sshInvocation(cfg(), remoteServiceAction(cfg(), action)), { inherit: true });
-      });
+    const cmd = program.command(action)
+      .description(`sudo systemctl ${action} the service`);
+    if (action !== 'start') cmd.option('-y, --yes', 'skip the confirmation prompt');
+    cmd.action(async (o) => {
+      if (action !== 'start' && !(await confirm(action, !!o.yes))) return;
+      const r = await deps.runner(sshInvocation(cfg(), remoteServiceAction(cfg(), action)), { inherit: true });
+      if (r.code !== 0) process.exitCode = r.code;
+    });
   }
 
   program.command('status')
     .description('is-active + deployed commit + recent log')
     .action(async () => {
-      await deps.runner(sshInvocation(cfg(), remoteStatus(cfg())), { inherit: true });
+      const r = await deps.runner(sshInvocation(cfg(), remoteStatus(cfg())), { inherit: true });
+      if (r.code !== 0) process.exitCode = r.code;
     });
 
   program.command('logs')
@@ -58,20 +61,23 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
     .option('-f, --follow', 'follow the log')
     .option('-n, --lines <n>', 'number of lines', (v) => parseInt(v, 10))
     .action(async (o) => {
-      await deps.runner(sshInvocation(cfg(), remoteLogs(cfg(), { follow: !!o.follow, lines: o.lines }), { tty: !!o.follow }), { inherit: true });
+      const r = await deps.runner(sshInvocation(cfg(), remoteLogs(cfg(), { follow: !!o.follow, lines: o.lines }), { tty: !!o.follow }), { inherit: true });
+      if (r.code !== 0) process.exitCode = r.code;
     });
 
   program.command('ssh')
     .description('interactive shell on the box')
     .action(async () => {
-      await deps.runner(sshInvocation(cfg(), undefined, { tty: true }), { inherit: true });
+      const r = await deps.runner(sshInvocation(cfg(), undefined, { tty: true }), { inherit: true });
+      if (r.code !== 0) process.exitCode = r.code;
     });
 
   program.command('run')
     .description('run an arbitrary command in the remote path')
     .argument('<cmd...>', 'command to run on the box')
     .action(async (cmd: string[]) => {
-      await deps.runner(sshInvocation(cfg(), remoteRun(cfg(), cmd.join(' '))), { inherit: true });
+      const r = await deps.runner(sshInvocation(cfg(), remoteRun(cfg(), cmd.join(' '))), { inherit: true });
+      if (r.code !== 0) process.exitCode = r.code;
     });
 
   return program;

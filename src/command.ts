@@ -36,7 +36,7 @@ function sq(v: string): string {
  */
 export function remotePull(cfg: DeployConfig): string {
   const path = sq(cfg.remotePath);
-  return `cd ${path} && b="$(git rev-parse HEAD)" && git pull --ff-only origin ${cfg.branch} 1>&2 && git diff --name-only "$b" HEAD`;
+  return `cd ${path} && b="$(git rev-parse HEAD)" && git pull --ff-only origin ${sq(cfg.branch)} 1>&2 && git diff --name-only "$b" HEAD`;
 }
 
 function globToRegExp(pattern: string): RegExp {
@@ -71,7 +71,7 @@ export interface LogOpts { follow?: boolean; lines?: number }
 
 export function remoteLogs(cfg: DeployConfig, opts: LogOpts = {}): string {
   const parts = [`sudo journalctl -u ${sq(cfg.service)}`];
-  if (opts.lines) parts.push(`-n ${opts.lines}`);
+  if (opts.lines !== undefined) parts.push(`-n ${opts.lines}`);
   if (opts.follow) parts.push('-f');
   else parts.push('--no-pager');
   return parts.join(' ');
