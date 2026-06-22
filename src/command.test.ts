@@ -92,8 +92,15 @@ test('remoteRun runs an arbitrary command in the remote path', () => {
   assert.equal(remoteRun(cfg, 'ls -la'), "cd '/home/deploy/orch-bot' && ls -la");
 });
 
-test('remoteSmoke greps the journal for the smoke string', () => {
-  assert.match(remoteSmoke(cfg), /journalctl -u 'orch-bot' .*grep -m1 -- 'concurrent long polling'/);
+test('remoteSmoke binds to the current service invocation, then greps the needle', () => {
+  const s = remoteSmoke(cfg);
+  // resolve the live invocation id of the just-restarted service…
+  assert.match(s, /systemctl show -p InvocationID --value 'orch-bot'/);
+  // …and scope journalctl to it, so only this run's logs are searched
+  assert.match(s, /journalctl _SYSTEMD_INVOCATION_ID="\$\(/);
+  assert.match(s, /grep -m1 -- 'concurrent long polling'/);
+  // the buggy fixed-size tail is gone — it could surface a previous run's start line
+  assert.doesNotMatch(s, /-n 30/);
 });
 
 test('remoteLogs with lines: 0 includes -n 0 (not dropped)', () => {

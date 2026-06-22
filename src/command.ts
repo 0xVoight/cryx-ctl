@@ -82,6 +82,10 @@ export function remoteRun(cfg: DeployConfig, rawCmd: string): string {
 }
 
 export function remoteSmoke(cfg: DeployConfig): string {
+  const svc = sq(cfg.service);
   const needle = cfg.smoke ?? '';
-  return `sudo journalctl -u ${sq(cfg.service)} -n 30 --no-pager | grep -m1 -- ${sq(needle)}`;
+  // Scope to the service's CURRENT systemd invocation, not a fixed -n tail.
+  // A fixed tail can surface a *previous* run's start line (a stale false-OK);
+  // the invocation id uniquely identifies this restart, so only its logs match.
+  return `sudo journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show -p InvocationID --value ${svc})" --no-pager | grep -m1 -- ${sq(needle)}`;
 }
