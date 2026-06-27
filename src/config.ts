@@ -12,6 +12,14 @@ export interface DeployConfig {
   runtime: 'tsx' | 'build';
   installWhen: string[];
   smoke?: string;
+  /** Deploy shape. 'service' (default) = restart a systemd unit; 'static' = build a SPA + HTTP-smoke. */
+  kind?: 'service' | 'static';
+  /** static: subdir of remotePath holding the app (package.json + build). Default = repo root. */
+  appDir?: string;
+  /** static: build command run in appDir. Default = 'npm run build'. */
+  buildCmd?: string;
+  /** static: HTTP URL to curl for the smoke check (needle = `smoke`). */
+  smokeUrl?: string;
 }
 
 function reqString(o: Record<string, unknown>, key: string): string {
@@ -48,6 +56,20 @@ export function parseConfig(raw: unknown): DeployConfig {
     throw new Error('cryx config: "smoke" must be a string');
   }
 
+  const kind = o.kind ?? 'service';
+  if (kind !== 'service' && kind !== 'static') {
+    throw new Error('cryx config: "kind" must be "service" or "static"');
+  }
+  if (o.appDir !== undefined && (typeof o.appDir !== 'string' || o.appDir.length === 0)) {
+    throw new Error('cryx config: "appDir" must be a non-empty string');
+  }
+  if (o.buildCmd !== undefined && (typeof o.buildCmd !== 'string' || o.buildCmd.length === 0)) {
+    throw new Error('cryx config: "buildCmd" must be a non-empty string');
+  }
+  if (o.smokeUrl !== undefined && (typeof o.smokeUrl !== 'string' || o.smokeUrl.length === 0)) {
+    throw new Error('cryx config: "smokeUrl" must be a non-empty string');
+  }
+
   const branch = o.branch === undefined ? 'main' : o.branch;
   if (typeof branch !== 'string' || branch.length === 0) {
     throw new Error('cryx config: "branch" must be a non-empty string');
@@ -64,6 +86,10 @@ export function parseConfig(raw: unknown): DeployConfig {
     runtime,
     installWhen,
     smoke: o.smoke as string | undefined,
+    kind,
+    appDir: o.appDir as string | undefined,
+    buildCmd: o.buildCmd as string | undefined,
+    smokeUrl: o.smokeUrl as string | undefined,
   };
 }
 

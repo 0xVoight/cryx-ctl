@@ -64,3 +64,30 @@ test('loadConfig throws a helpful error when the file is missing', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('parseConfig defaults kind to "service"', () => {
+  assert.equal(parseConfig(base).kind, 'service');
+});
+
+test('parseConfig accepts kind "static" with static fields', () => {
+  const cfg = parseConfig({
+    ...base, kind: 'static', appDir: 'miniapp',
+    buildCmd: 'npm run build', smokeUrl: 'http://127.0.0.1:13033/',
+  });
+  assert.equal(cfg.kind, 'static');
+  assert.equal(cfg.appDir, 'miniapp');
+  assert.equal(cfg.buildCmd, 'npm run build');
+  assert.equal(cfg.smokeUrl, 'http://127.0.0.1:13033/');
+});
+
+test('parseConfig rejects an invalid kind', () => {
+  assert.throws(() => parseConfig({ ...base, kind: 'lambda' }), /kind/);
+});
+
+test('parseConfig rejects a non-string appDir', () => {
+  assert.throws(() => parseConfig({ ...base, kind: 'static', appDir: 5 }), /appDir/);
+});
+
+test('parseConfig rejects an empty smokeUrl', () => {
+  assert.throws(() => parseConfig({ ...base, kind: 'static', smokeUrl: '' }), /smokeUrl/);
+});
