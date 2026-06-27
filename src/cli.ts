@@ -31,7 +31,7 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
   const cfg = (): DeployConfig => deps.loadConfig(process.cwd());
 
   program.command('deploy')
-    .description('git pull -> (npm ci if deps changed) -> restart -> smoke')
+    .description('git pull -> (npm ci if deps changed) -> restart (service) or rebuild (static) -> smoke')
     .option('-y, --yes', 'skip the confirmation prompt')
     .action(async (o) => {
       if (!(await confirm('deploy', !!o.yes))) return;

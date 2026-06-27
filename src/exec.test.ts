@@ -46,3 +46,30 @@ test('deploy aborts before restart when pull fails (fail-safe ordering)', async 
   await assert.rejects(() => deploy(cfg, { runner, log: () => {} }), /pull/i);
   assert.doesNotMatch(joined(calls).join('\n'), /systemctl restart/);
 });
+
+const staticCfg: DeployConfig = {
+  host: 'h', sshPort: 22, user: 'u', identityFile: '~/k', remotePath: '/srv/app', service: 'web',
+  branch: 'main', runtime: 'tsx', installWhen: ['miniapp/package.json'],
+  kind: 'static', appDir: 'miniapp', buildCmd: 'npm run build',
+  smokeUrl: 'http://127.0.0.1:13033/', smoke: 'OK',
+};
+
+test('static deploy builds and HTTP-smokes, never restarts', async () => {
+  // calls: pull(no dep change) -> build -> http smoke
+  const { runner, calls } = fakeRunner(['src/x.ts', '', 'OK: <title>']);
+  await deploy(staticCfg, { runner, log: () => {} });
+  const all = joined(calls).join('\n');
+  assert.match(all, /npm run build/);
+  assert.match(all, /curl -fsS 'http:\/\/127\.0\.0\.1:13033\/'/);
+  assert.doesNotMatch(all, /systemctl restart/);
+});
+
+test('static deploy runs npm ci in appDir when deps changed', async () => {
+  // calls: pull(dep change) -> npm ci -> build -> http smoke
+  const { runner, calls } = fakeRunner(['miniapp/package.json', '', '', 'OK']);
+  await deploy(staticCfg, { runner, log: () => {} });
+  const all = joined(calls).join('\n');
+  assert.match(all, /cd '\/srv\/app\/miniapp' && npm ci/);
+  assert.match(all, /npm run build/);
+  assert.doesNotMatch(all, /systemctl restart/);
+});
