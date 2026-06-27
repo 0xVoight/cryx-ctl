@@ -54,8 +54,23 @@ export function needsInstall(changed: string[], cfg: DeployConfig): boolean {
   );
 }
 
+/** Resolve the app's build/install directory: remotePath, plus appDir when it is a real subdir. */
+export function appPath(cfg: DeployConfig): string {
+  const dir = cfg.appDir;
+  return dir && dir !== '.' ? `${cfg.remotePath}/${dir}` : cfg.remotePath;
+}
+
 export function remoteInstall(cfg: DeployConfig): string {
-  return `cd ${sq(cfg.remotePath)} && npm ci`;
+  return `cd ${sq(appPath(cfg))} && npm ci`;
+}
+
+export function remoteBuild(cfg: DeployConfig): string {
+  return `cd ${sq(appPath(cfg))} && ${cfg.buildCmd ?? 'npm run build'}`;
+}
+
+export function remoteHttpSmoke(cfg: DeployConfig): string {
+  const needle = cfg.smoke ?? '';
+  return `curl -fsS ${sq(cfg.smokeUrl ?? '')} | grep -m1 -- ${sq(needle)}`;
 }
 
 export function remoteServiceAction(cfg: DeployConfig, action: 'restart' | 'stop' | 'start'): string {

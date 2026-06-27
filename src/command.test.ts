@@ -4,6 +4,7 @@ import {
   expandHome, sshConnectArgs, sshInvocation,
   remotePull, needsInstall, remoteInstall, remoteServiceAction,
   remoteStatus, remoteLogs, remoteRun, remoteSmoke,
+  appPath, remoteBuild, remoteHttpSmoke,
 } from './command.js';
 import type { DeployConfig } from './config.js';
 
@@ -112,4 +113,34 @@ test('sq() escapes an embedded single quote via POSIX pattern', () => {
     remoteServiceAction({ ...cfg, service: "a'b" }, 'restart'),
     "sudo systemctl restart 'a'\\''b'",
   );
+});
+
+test('appPath returns remotePath when no appDir', () => {
+  assert.equal(appPath(cfg), '/home/deploy/orch-bot');
+});
+
+test('appPath appends appDir when set', () => {
+  assert.equal(appPath({ ...cfg, appDir: 'miniapp' }), '/home/deploy/orch-bot/miniapp');
+});
+
+test('appPath treats "." appDir as no subdir', () => {
+  assert.equal(appPath({ ...cfg, appDir: '.' }), '/home/deploy/orch-bot');
+});
+
+test('remoteInstall is appDir-aware', () => {
+  assert.match(remoteInstall({ ...cfg, appDir: 'miniapp' }), /cd '\/home\/deploy\/orch-bot\/miniapp' && npm ci/);
+});
+
+test('remoteBuild runs the build cmd in appPath', () => {
+  assert.match(remoteBuild({ ...cfg, appDir: 'miniapp', buildCmd: 'npm run build' }), /cd '\/home\/deploy\/orch-bot\/miniapp' && npm run build/);
+});
+
+test('remoteBuild defaults to npm run build', () => {
+  assert.match(remoteBuild(cfg), /npm run build/);
+});
+
+test('remoteHttpSmoke curls smokeUrl and greps the needle', () => {
+  const s = remoteHttpSmoke({ ...cfg, smokeUrl: 'http://127.0.0.1:13033/', smoke: 'Cryzothic Core' });
+  assert.match(s, /curl -fsS 'http:\/\/127\.0\.0\.1:13033\/'/);
+  assert.match(s, /grep -m1 -- 'Cryzothic Core'/);
 });
